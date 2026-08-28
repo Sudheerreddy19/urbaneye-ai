@@ -1,0 +1,45 @@
+# ── Java / Spring Boot ───────────────────────────────────────────
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+.mvn/
+mvnw
+mvnw.cmd
+
+# ── Environment / Secrets ────────────────────────────────────────
+.env
+.env.local
+.env.production
+# Keep the example file
+!.env.example
+
+# ── Frontend ─────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.local
+
+# ── IDE ──────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── OS ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-error.log*
+
+# ── Docker ───────────────────────────────────────────────────────
+# Keep docker-compose.yml and Dockerfile tracked

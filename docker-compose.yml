@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: urbaneye-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: urbaneye_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your_postgres_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: urbaneye-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/urbaneye_db
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: your_postgres_password
+      GOOGLE_MAPS_KEY: AIzaSyAoSq2HEgrT_CoqC5Ra1PYeDCyu96WTyx0
+      JWT_SECRET: VXJiYW5FeWVBSVNlY3JldEtleUZvckpXVEF1dGhlbnRpY2F0aW9uQmFja2VuZDIwMjY=
+
+volumes:
+  postgres_data:
