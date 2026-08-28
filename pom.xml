@@ -19,7 +19,7 @@
     <description>UrbanEye AI Backend — Smart City Traffic and Emergency Management System</description>
 
     <properties>
-        <java.version>23</java.version>
+        <java.version>21</java.version>
         <jjwt.version>0.12.6</jjwt.version>
     </properties>
 
