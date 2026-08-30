@@ -1,14 +1,24 @@
-# ── Build Stage ──
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+# ── Stage 1: Build React Frontend ──
+FROM node:20-alpine AS frontend-build
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
+
+# ── Stage 2: Build Spring Boot Backend ──
+FROM maven:3.9.6-eclipse-temurin-21 AS backend-build
 WORKDIR /app
 COPY pom.xml .
 COPY src ./src
+# Copy built static assets from Stage 1 into Spring Boot static resources
+COPY --from=frontend-build /frontend/dist ./src/main/resources/static
 RUN mvn clean package -DskipTests
 
-# ── Production Image ──
+# ── Stage 3: Production Image ──
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=build /app/target/urbaneye-backend-1.0.0.jar app.jar
+COPY --from=backend-build /app/target/urbaneye-backend-1.0.0.jar app.jar
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

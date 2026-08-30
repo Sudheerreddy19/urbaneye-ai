@@ -1,10 +1,12 @@
 /**
  * UrbanEye AI — Central API Service
- * All requests are proxied through Vite (/api → http://localhost:8080/api)
- * so no CORS issues during development.
+ * Supports direct Railway/Production backend via VITE_API_BASE_URL,
+ * or defaults to Vite local proxy (/api → http://localhost:8080/api).
  */
 
-const BASE_URL = '/api';
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+const BASE_URL = API_ROOT ? `${API_ROOT}/api` : '/api';
+
 
 // ─── Token helpers ─────────────────────────────────────────────────────────
 
@@ -216,4 +218,14 @@ export async function getRoadSegments() {
 export async function getHospitals() {
   return request('/hospital/details');
 }
+
+/**
+ * Health check endpoint
+ */
+export async function checkHealth() {
+  const root = API_ROOT || '';
+  const res = await fetch(`${root}/api/health`);
+  return res.json();
+}
+
 

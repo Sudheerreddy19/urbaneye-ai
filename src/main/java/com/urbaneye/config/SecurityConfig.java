@@ -47,8 +47,21 @@ public class SecurityConfig {
                     // Permit all preflight OPTIONS requests
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                    // Public Endpoints (Citizen Read & Telemetry)
-                    .requestMatchers("/", "/api/health", "/error").permitAll()
+                    // Public Frontend Static Assets & Routes
+                    .requestMatchers(
+                            "/",
+                            "/index.html",
+                            "/assets/**",
+                            "/favicon.svg",
+                            "/icons.svg",
+                            "/login",
+                            "/register",
+                            "/citizen/**",
+                            "/police/**",
+                            "/hospital/**",
+                            "/api/health",
+                            "/error"
+                    ).permitAll()
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/weather/**").permitAll()
