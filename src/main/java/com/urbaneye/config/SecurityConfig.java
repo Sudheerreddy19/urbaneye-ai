@@ -48,6 +48,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                     // Public Endpoints (Citizen Read & Telemetry)
+                    .requestMatchers("/", "/api/health", "/error").permitAll()
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/weather/**").permitAll()
