@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import jakarta.annotation.PostConstruct;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,11 +20,29 @@ public class JwtTokenProvider {
 
     private static final Logger log = LoggerFactory.getLogger(JwtTokenProvider.class);
 
-    @Value("${app.jwt.secret}")
+    @Value("${app.jwt.secret:}")
     private String jwtSecret;
 
-    @Value("${app.jwt.expiration}")
+    @Value("${app.jwt.expiration:86400000}")
     private long jwtExpirationMs;
+
+    @PostConstruct
+    public void validateConfiguration() {
+        if (jwtSecret == null || jwtSecret.trim().isEmpty()) {
+            throw new IllegalStateException(
+                "FATAL CONFIGURATION ERROR: JWT_SECRET environment variable is missing or empty. " +
+                "Please configure JWT_SECRET with a secure 256-bit Base64 encoded key."
+            );
+        }
+        try {
+            byte[] keyBytes = Decoders.BASE64.decode(jwtSecret.trim());
+            if (keyBytes.length < 32) {
+                throw new IllegalStateException("FATAL: JWT_SECRET must be at least 256 bits (32 bytes) in length.");
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("FATAL: JWT_SECRET is not a valid Base64 string: " + e.getMessage());
+        }
+    }
 
     public String generateToken(UserDetails userDetails, Long userId, String role) {
         Map<String, Object> claims = new HashMap<>();

@@ -76,7 +76,7 @@ public class EmergencyRequestController {
 
         // IDOR Check: Citizen can only cancel their own request
         if (user.getRole() == Role.CITIZEN || user.getRole() == Role.USER) {
-            if (req.getUser() != null && !req.getUser().getId().equals(user.getId())) {
+            if (req.getUser() == null || !req.getUser().getId().equals(user.getId())) {
                 throw new AccessDeniedException("Access denied: You cannot cancel another citizen's emergency request.");
             }
         }
@@ -91,7 +91,7 @@ public class EmergencyRequestController {
 
         // IDOR Check: Citizen can only view their own request
         if (user.getRole() == Role.CITIZEN || user.getRole() == Role.USER) {
-            if (req.getUser() != null && !req.getUser().getId().equals(user.getId())) {
+            if (req.getUser() == null || !req.getUser().getId().equals(user.getId())) {
                 throw new AccessDeniedException("Access denied: You cannot view another citizen's emergency request.");
             }
         }

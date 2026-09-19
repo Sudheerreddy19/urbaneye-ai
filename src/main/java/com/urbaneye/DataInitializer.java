@@ -10,6 +10,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * Seeds the database with rich sample data for Phase 1, 2, 3, 4, and 5:
  * - Zero hardcoded users (all accounts must be registered via registration endpoint)
@@ -79,10 +81,35 @@ public class DataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        // Enforce removal of any legacy default demo accounts
-        userRepository.findByEmail("user@urbaneye.com").ifPresent(userRepository::delete);
-        userRepository.findByEmail("police@urbaneye.com").ifPresent(userRepository::delete);
-        userRepository.findByEmail("hospital@urbaneye.com").ifPresent(userRepository::delete);
+        // Safe one-time purge check: Only executes if legacy demo users exist
+        List<String> legacyEmails = List.of("user@urbaneye.com", "police@urbaneye.com", "hospital@urbaneye.com");
+        boolean hasLegacy = legacyEmails.stream().anyMatch(e -> userRepository.findByEmail(e).isPresent());
+        if (hasLegacy) {
+            for (String email : legacyEmails) {
+                userRepository.findByEmail(email).ifPresent(user -> {
+                    try {
+                        List<Incident> incidents = incidentRepository.findAll();
+                        for (Incident inc : incidents) {
+                            if (inc.getReportedBy() != null && inc.getReportedBy().getId().equals(user.getId())) {
+                                inc.setReportedBy(null);
+                                incidentRepository.save(inc);
+                            }
+                        }
+                        List<EmergencyRequest> requests = emergencyRequestRepository.findAll();
+                        for (EmergencyRequest req : requests) {
+                            if (req.getUser() != null && req.getUser().getId().equals(user.getId())) {
+                                req.setUser(null);
+                                emergencyRequestRepository.save(req);
+                            }
+                        }
+                        userRepository.delete(user);
+                        log.info("Purged legacy demo account: {}", email);
+                    } catch (Exception e) {
+                        log.warn("Could not delete legacy demo user {}: {}", email, e.getMessage());
+                    }
+                });
+            }
+        }
 
         if (hospitalRepository.count() > 0) {
             log.info("Smart city infrastructure already seeded — skipping DataInitializer.");
