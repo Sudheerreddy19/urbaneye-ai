@@ -13,96 +13,78 @@ import {
   X,
   Navigation
 } from 'lucide-react';
-
-const initialTransitList = [
-  {
-    id: 'bus-21a',
-    type: 'bus',
-    routeNumber: '21A',
-    routeName: 'Guntur Bus Stand → Amaravati High-Speed',
-    driverName: 'K. Srinivasa Rao',
-    driverPhone: '+91 98480 11221',
-    eta: '3 min',
-    distance: '400m away',
-    occupancyPercent: 72,
-    occupancyStatus: 'Moderate',
-    occupancyColor: 'bg-emerald-500',
-    occupancyTextColor: 'text-emerald-400',
-    nextStop: 'Naaz Centre Crossing',
-    fare: '₹25',
-    ac: true,
-  },
-  {
-    id: 'bus-09b',
-    type: 'bus',
-    routeNumber: '09B',
-    routeName: 'Brodipet 4/1 → Mangalagiri Capital Hub',
-    driverName: 'M. Ramanjaneyulu',
-    driverPhone: '+91 98480 22332',
-    eta: '5 min',
-    distance: '800m away',
-    occupancyPercent: 92,
-    occupancyStatus: 'Crowded',
-    occupancyColor: 'bg-rose-500',
-    occupancyTextColor: 'text-rose-400',
-    nextStop: 'Old Bus Stand Junction',
-    fare: '₹20',
-    ac: false,
-  },
-  {
-    id: 'bus-17c',
-    type: 'bus',
-    routeNumber: '17C',
-    routeName: 'Pattabhipuram → Railway Station Loop',
-    driverName: 'P. Venkat Reddy',
-    driverPhone: '+91 98480 33443',
-    eta: '6 min',
-    distance: '1.2 km away',
-    occupancyPercent: 48,
-    occupancyStatus: 'Seats Available',
-    occupancyColor: 'bg-blue-500',
-    occupancyTextColor: 'text-blue-400',
-    nextStop: 'Medical College Gate',
-    fare: '₹15',
-    ac: true,
-  },
-  {
-    id: 'amb-101',
-    type: 'ambulance',
-    routeNumber: 'AMB-101',
-    routeName: 'Emergency Critical Response Transport',
-    driverName: 'Ramesh Kumar',
-    driverPhone: '+91 98765 43220',
-    eta: '3 min',
-    distance: '1.2 km away',
-    occupancyPercent: 100,
-    occupancyStatus: 'CODE RED PRIORITY',
-    occupancyColor: 'bg-rose-600 animate-pulse',
-    occupancyTextColor: 'text-rose-400',
-    nextStop: 'Ala Hospital Green Corridor',
-    fare: 'Emergency Tier',
-    ac: true,
-  },
-  {
-    id: 'traffic-sig-04',
-    type: 'traffic',
-    routeNumber: 'SIG-04',
-    routeName: 'Brodipet Main Crossing',
-    eta: '18s green',
-    distance: '350m ahead',
-    occupancyPercent: 65,
-    occupancyStatus: 'Smooth Flow',
-    occupancyColor: 'bg-emerald-500',
-    occupancyTextColor: 'text-emerald-400',
-    nextStop: 'Preempted Wave',
-    fare: 'Normal',
-    ac: false,
-  },
-];
+import { useTransitStore } from '../../../store/transitStore';
+import { useUrbanData } from '../../../context/UrbanDataContext';
 
 export const NearbyTransit = ({ onSelectTransitItem, selectedItem }) => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [showAllModal, setShowAllModal] = useState(false);
+  const { buses: liveBuses, setSelectedBus } = useTransitStore();
+  const { data } = useUrbanData();
+
+  // Dynamic public transit items derived from real live telemetry
+  const dynamicBusItems = (liveBuses && liveBuses.length > 0 ? liveBuses : (data?.buses || [])).map((b) => {
+    const occupancy = b.seatOccupancy ?? 50;
+    const isFull = occupancy >= 85;
+    const isModerate = occupancy >= 50 && occupancy < 85;
+
+    return {
+      id: b.id || b.busNumber,
+      type: 'bus',
+      routeNumber: b.routeNumber || '21A',
+      routeName: b.routeName || 'Urban Metro Transit Corridor',
+      driverName: b.driverName || 'K. Srinivasa Rao',
+      driverPhone: b.driverPhone || '+91 98480 11221',
+      eta: b.eta || `${b.etaMinutes || 3} min`,
+      distance: `${b.distanceKm || 0.8} km away`,
+      occupancyPercent: occupancy,
+      occupancyStatus: isFull ? 'Bus Full' : isModerate ? 'Moderate' : 'Seats Available',
+      occupancyColor: isFull ? 'bg-rose-500' : isModerate ? 'bg-amber-500' : 'bg-emerald-500',
+      occupancyTextColor: isFull ? 'text-rose-400' : isModerate ? 'text-amber-400' : 'text-emerald-400',
+      nextStop: b.nextStop || 'Brodipet Main Road',
+      fare: '₹25',
+      ac: (b.acStatus || '').toLowerCase().includes('ac') || true,
+      rawBus: b,
+    };
+  });
+
+  const dynamicAmbulanceItems = (data?.ambulances || []).slice(0, 2).map((amb) => ({
+    id: amb.id,
+    type: 'ambulance',
+    routeNumber: amb.id,
+    routeName: `${amb.hospitalName || 'Ala Hospital'} EMS Corridor`,
+    driverName: amb.driverName || 'Ramesh Kumar',
+    driverPhone: amb.driverPhone || '+91 98765 43220',
+    eta: amb.eta || '3 min',
+    distance: `${amb.speedKmph > 0 ? '1.2 km away' : 'At Station'}`,
+    occupancyPercent: 100,
+    occupancyStatus: amb.isBooked ? 'IN TRANSIT / BUSY' : 'AVAILABLE (STANDBY)',
+    occupancyColor: amb.isBooked ? 'bg-rose-600 animate-pulse' : 'bg-emerald-500',
+    occupancyTextColor: amb.isBooked ? 'text-rose-400' : 'text-emerald-400',
+    nextStop: amb.hospitalName || 'Ala Super Speciality Hospital',
+    fare: 'Emergency Tier',
+    ac: true,
+  }));
+
+  const dynamicTrafficItems = [
+    {
+      id: 'traffic-sig-04',
+      type: 'traffic',
+      routeNumber: 'SIG-04',
+      routeName: 'Brodipet Main Crossing',
+      eta: '18s green',
+      distance: '350m ahead',
+      occupancyPercent: 65,
+      occupancyStatus: 'Smooth Flow',
+      occupancyColor: 'bg-emerald-500',
+      occupancyTextColor: 'text-emerald-400',
+      nextStop: 'Preempted Wave',
+      fare: 'Normal',
+      ac: false,
+    },
+  ];
+
+  const transitList = [...dynamicBusItems, ...dynamicAmbulanceItems, ...dynamicTrafficItems];
 
   const filterTabs = [
     { id: 'all', label: 'All' },
@@ -111,7 +93,7 @@ export const NearbyTransit = ({ onSelectTransitItem, selectedItem }) => {
     { id: 'traffic', label: 'Traffic' },
   ];
 
-  const filteredItems = initialTransitList.filter((item) => {
+  const filteredItems = transitList.filter((item) => {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'buses') return item.type === 'bus';
     if (activeFilter === 'ambulances') return item.type === 'ambulance';
@@ -178,7 +160,10 @@ export const NearbyTransit = ({ onSelectTransitItem, selectedItem }) => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.25, delay: idx * 0.05 }}
-                  onClick={() => onSelectTransitItem && onSelectTransitItem(item)}
+                  onClick={() => {
+                    if (onSelectTransitItem) onSelectTransitItem(item);
+                    if (item.rawBus) setSelectedBus(item.rawBus);
+                  }}
                   className={`group relative p-3 rounded-2xl border transition-all duration-200 cursor-pointer ${
                     isSelected
                       ? 'bg-blue-950/60 border-blue-500 ring-1 ring-blue-500/50 shadow-lg'

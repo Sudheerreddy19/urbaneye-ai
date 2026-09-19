@@ -99,12 +99,7 @@ export async function login(email, password) {
   });
 }
 
-/**
- * Register a new user.
- * frontendRole: 'citizen' | 'police' | 'hospital'
- * Returns AuthResponse
- */
-export async function register({ name, email, phone, password, frontendRole }) {
+export async function register({ name, email, phone, password, frontendRole, authorizationKey }) {
   return request('/auth/register', {
     method: 'POST',
     body: JSON.stringify({
@@ -113,24 +108,18 @@ export async function register({ name, email, phone, password, frontendRole }) {
       phone,
       password,
       role: frontendRoleToBackend(frontendRole),
+      authorizationKey: authorizationKey || undefined,
     }),
   });
 }
 
 /**
- * Google / SSO login — sends user info directly to backend which
- * creates or finds the user and returns a JWT.
- * frontendRole: 'citizen' | 'police' | 'hospital'
+ * Notify backend of logout.
  */
-export async function googleAuth({ email, name, frontendRole }) {
-  return request('/auth/google', {
+export async function logoutApi() {
+  return request('/auth/logout', {
     method: 'POST',
-    body: JSON.stringify({
-      email,
-      name: name || email.split('@')[0],
-      role: frontendRoleToBackend(frontendRole),
-    }),
-  });
+  }).catch(() => {});
 }
 
 // ─── User Profile API ────────────────────────────────────────────────────────

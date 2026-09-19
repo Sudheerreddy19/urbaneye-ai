@@ -138,7 +138,8 @@ export const AuthHub = ({ initialRole = 'citizen', onBack, onLoginSuccess, onLog
   const [signUpData, setSignUpData] = useState({
     name: '',
     identifier: '',
-    extraField: '', // Mobile for citizen, precinct for police, dept for hospital
+    extraField: '', // Mobile for citizen, badge for police, staff ID for hospital
+    authorizationKey: '', // Required for police and hospital
     password: '',
     confirmPassword: '',
     agreed: false
@@ -178,6 +179,11 @@ export const AuthHub = ({ initialRole = 'citizen', onBack, onLoginSuccess, onLog
       return;
     }
 
+    if ((activeRole === 'police' || activeRole === 'hospital') && !signUpData.authorizationKey?.trim()) {
+      setSignUpError(`${activeRole === 'police' ? 'Police Department Key' : 'Hospital Department Key'} is required.`);
+      return;
+    }
+
     setSignUpSubmitting(true);
     try {
       const role = await register({
@@ -186,6 +192,7 @@ export const AuthHub = ({ initialRole = 'citizen', onBack, onLoginSuccess, onLog
         phone: signUpData.extraField,
         password: signUpData.password,
         frontendRole: activeRole,
+        authorizationKey: signUpData.authorizationKey ? signUpData.authorizationKey.trim() : undefined,
       });
       setSignUpSuccess(true);
       setTimeout(() => {
@@ -599,6 +606,39 @@ export const AuthHub = ({ initialRole = 'citizen', onBack, onLoginSuccess, onLog
                         </div>
                       </div>
                     </div>
+
+                    {/* Department Authorization Key (Required for Police and Hospital) */}
+                    {(activeRole === 'police' || activeRole === 'hospital') && (
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-amber-400 flex items-center gap-1.5">
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>
+                            {activeRole === 'police' ? "Police Department Provisioning Key" : "Hospital Authorization Key"}
+                          </span>
+                        </label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-amber-500">
+                            <Lock className="w-4 h-4" />
+                          </div>
+                          <input
+                            type="password"
+                            required
+                            value={signUpData.authorizationKey}
+                            onChange={(e) => setSignUpData({ ...signUpData, authorizationKey: e.target.value })}
+                            placeholder={
+                              activeRole === 'police' ? "Enter police department provisioning secret" :
+                              "Enter hospital medical authority secret"
+                            }
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-800/80 border border-amber-600/50 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition font-mono"
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          {activeRole === 'police'
+                            ? "Officer accounts require authorization from police headquarters."
+                            : "Hospital accounts require verified hospital management authorization."}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Password & Confirm */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

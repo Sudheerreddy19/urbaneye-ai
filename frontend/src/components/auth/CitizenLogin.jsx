@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 
 export const CitizenLogin = ({ onLoginSuccess, onLogin, onToggleMode }) => {
-  const { login, googleLogin } = useAuth();
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState({
     identifier: '',
@@ -23,7 +23,6 @@ export const CitizenLogin = ({ onLoginSuccess, onLogin, onToggleMode }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [oauthLoading, setOauthLoading] = useState(null); // 'Google' | 'Microsoft' | null
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,27 +38,6 @@ export const CitizenLogin = ({ onLoginSuccess, onLogin, onToggleMode }) => {
       setErrorMessage(err.message || 'Invalid credentials. Please try again.');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  // Google OAuth: send email + role to backend which creates/finds the user
-  const handleOAuth = async (provider) => {
-    const email = formData.identifier.trim();
-    if (!email) {
-      setErrorMessage('Please enter your email address first.');
-      return;
-    }
-    setOauthLoading(provider);
-    setErrorMessage('');
-    try {
-      const role = await googleLogin({ email, name: '', frontendRole: 'citizen' });
-      setLoginSuccess(true);
-      if (onLoginSuccess) onLoginSuccess(role);
-      if (onLogin) onLogin(role);
-    } catch (err) {
-      setErrorMessage(err.message || 'Authentication failed. Please try again.');
-    } finally {
-      setOauthLoading(null);
     }
   };
 
@@ -189,7 +167,7 @@ export const CitizenLogin = ({ onLoginSuccess, onLogin, onToggleMode }) => {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isSubmitting || oauthLoading !== null}
+            disabled={isSubmitting}
             className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
           >
             {isSubmitting ? (
@@ -199,59 +177,6 @@ export const CitizenLogin = ({ onLoginSuccess, onLogin, onToggleMode }) => {
             )}
           </button>
         </form>
-
-        {/* Social Logins */}
-        <div className="mt-4 space-y-3">
-          <div className="relative flex items-center justify-center">
-            <div className="border-t border-slate-800 w-full" />
-            <span className="bg-slate-900 px-2.5 text-[11px] font-mono text-slate-500 uppercase tracking-wider">
-              Or continue with
-            </span>
-            <div className="border-t border-slate-800 w-full" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2.5">
-            {/* Google OAuth Button */}
-            <button
-              type="button"
-              disabled={oauthLoading !== null || isSubmitting}
-              onClick={() => handleOAuth('Google')}
-              className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-slate-300 hover:text-white transition cursor-pointer disabled:opacity-60 shadow-sm"
-            >
-              {oauthLoading === 'Google' ? (
-                <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
-                  <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.5 1.9 7.2l3.7 2.9C6.5 7.4 9 5 12 5z" />
-                  <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
-                  <path fill="#FBBC05" d="M5.6 14.9c-.2-.7-.4-1.4-.4-2.2 0-.8.2-1.5.4-2.2L1.9 7.6C.7 10 0 12.7 0 15.6s.7 5.6 1.9 8l3.7-2.9z" />
-                  <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2-6.4-4.8L1.9 16.4C3.7 20.1 7.5 23 12 23z" />
-                </svg>
-              )}
-              <span>{oauthLoading === 'Google' ? 'Connecting...' : 'Google'}</span>
-            </button>
-
-            {/* Microsoft OAuth Button */}
-            <button
-              type="button"
-              disabled={oauthLoading !== null || isSubmitting}
-              onClick={() => handleOAuth('Microsoft')}
-              className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-slate-300 hover:text-white transition cursor-pointer disabled:opacity-60 shadow-sm"
-            >
-              {oauthLoading === 'Microsoft' ? (
-                <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                  <path fill="#F25022" d="M1 1h10v10H1z"/>
-                  <path fill="#7FBA00" d="M13 1h10v10H13z"/>
-                  <path fill="#00A4EF" d="M1 13h10v10H1z"/>
-                  <path fill="#FFB900" d="M13 13h10v10H13z"/>
-                </svg>
-              )}
-              <span>{oauthLoading === 'Microsoft' ? 'Connecting...' : 'Microsoft'}</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Footer Link */}

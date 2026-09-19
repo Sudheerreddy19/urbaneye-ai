@@ -4,27 +4,22 @@ import com.urbaneye.dto.EmergencyRequestDTO;
 import com.urbaneye.entity.EmergencyRequest;
 import com.urbaneye.entity.User;
 import com.urbaneye.entity.enums.EmergencyStatus;
+import com.urbaneye.entity.enums.Role;
 import com.urbaneye.service.EmergencyRequestService;
 import com.urbaneye.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
- * Emergency Request REST API — Step 7
- *
- * POST   /api/emergency/request              — user creates request
- * PUT    /api/emergency/{id}/accept          — dispatch accepts
- * PUT    /api/emergency/{id}/status          — update lifecycle status
- * PUT    /api/emergency/{id}/complete        — mark completed
- * PUT    /api/emergency/{id}/cancel          — cancel request
- * GET    /api/emergency/{id}                 — request detail
- * GET    /api/emergency/active               — all active requests (police)
- * GET    /api/emergency/my                   — current user's requests
+ * Emergency Request REST API
+ * Protected with strict IDOR ownership checks and role-based permissions.
  */
 @RestController
 @RequestMapping("/api/emergency")
@@ -51,12 +46,14 @@ public class EmergencyRequestController {
 
     /** Dispatch/driver accepts the request → ambulance becomes EMERGENCY */
     @PutMapping("/{id}/accept")
+    @PreAuthorize("hasAnyRole('POLICE', 'HOSPITAL')")
     public ResponseEntity<EmergencyRequest> acceptRequest(@PathVariable Long id) {
         return ResponseEntity.ok(emergencyService.acceptRequest(id));
     }
 
     /** Progress through EN_ROUTE → ARRIVED → PATIENT_PICKED */
     @PutMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('POLICE', 'HOSPITAL')")
     public ResponseEntity<EmergencyRequest> updateStatus(
             @PathVariable Long id,
             @RequestParam String status) {
@@ -66,24 +63,44 @@ public class EmergencyRequestController {
 
     /** Mark request completed — ambulance freed */
     @PutMapping("/{id}/complete")
+    @PreAuthorize("hasAnyRole('POLICE', 'HOSPITAL')")
     public ResponseEntity<EmergencyRequest> completeRequest(@PathVariable Long id) {
         return ResponseEntity.ok(emergencyService.completeRequest(id));
     }
 
-    /** Cancel a request */
+    /** Cancel a request - protected by IDOR ownership check */
     @PutMapping("/{id}/cancel")
-    public ResponseEntity<EmergencyRequest> cancelRequest(@PathVariable Long id) {
+    public ResponseEntity<EmergencyRequest> cancelRequest(@PathVariable Long id, Authentication auth) {
+        User user = userService.getByEmail(auth.getName());
+        EmergencyRequest req = emergencyService.getById(id);
+
+        // IDOR Check: Citizen can only cancel their own request
+        if (user.getRole() == Role.CITIZEN || user.getRole() == Role.USER) {
+            if (req.getUser() != null && !req.getUser().getId().equals(user.getId())) {
+                throw new AccessDeniedException("Access denied: You cannot cancel another citizen's emergency request.");
+            }
+        }
         return ResponseEntity.ok(emergencyService.cancelRequest(id));
     }
 
-    /** Get request details */
+    /** Get request details - protected by IDOR ownership check */
     @GetMapping("/{id}")
-    public ResponseEntity<EmergencyRequest> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(emergencyService.getById(id));
+    public ResponseEntity<EmergencyRequest> getById(@PathVariable Long id, Authentication auth) {
+        User user = userService.getByEmail(auth.getName());
+        EmergencyRequest req = emergencyService.getById(id);
+
+        // IDOR Check: Citizen can only view their own request
+        if (user.getRole() == Role.CITIZEN || user.getRole() == Role.USER) {
+            if (req.getUser() != null && !req.getUser().getId().equals(user.getId())) {
+                throw new AccessDeniedException("Access denied: You cannot view another citizen's emergency request.");
+            }
+        }
+        return ResponseEntity.ok(req);
     }
 
-    /** All active requests (police / hospital use) */
+    /** All active requests (police / hospital use only) */
     @GetMapping("/active")
+    @PreAuthorize("hasAnyRole('POLICE', 'HOSPITAL')")
     public ResponseEntity<List<EmergencyRequest>> getActive() {
         return ResponseEntity.ok(emergencyService.getActiveRequests());
     }

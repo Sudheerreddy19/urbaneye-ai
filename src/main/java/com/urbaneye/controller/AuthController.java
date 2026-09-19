@@ -5,10 +5,11 @@ import com.urbaneye.dto.LoginRequest;
 import com.urbaneye.dto.RegisterRequest;
 import com.urbaneye.service.AuthService;
 import jakarta.validation.Valid;
-import com.urbaneye.dto.GoogleLoginRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,9 +31,8 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
-    @PostMapping("/google")
-    public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
-        return ResponseEntity.ok(authService.googleLogin(request));
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout() {
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 }
-

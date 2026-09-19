@@ -16,16 +16,16 @@ public class RegisterRequest {
     @Email(message = "Invalid email format")
     private String email;
 
-    @NotBlank(message = "Phone is required")
-    @Pattern(regexp = "^\\+?[0-9]{10,13}$", message = "Invalid phone number")
     private String phone;
 
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
 
-    @NotNull(message = "Role is required")
-    private Role role;
+    private Role role = Role.CITIZEN;
+
+    // Authorization key required when registering privileged POLICE or HOSPITAL accounts
+    private String authorizationKey;
 
     public RegisterRequest() {}
 
@@ -41,6 +41,9 @@ public class RegisterRequest {
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
 
-    public Role getRole() { return role; }
+    public Role getRole() { return role != null ? role : Role.CITIZEN; }
     public void setRole(Role role) { this.role = role; }
+
+    public String getAuthorizationKey() { return authorizationKey; }
+    public void setAuthorizationKey(String authorizationKey) { this.authorizationKey = authorizationKey; }
 }

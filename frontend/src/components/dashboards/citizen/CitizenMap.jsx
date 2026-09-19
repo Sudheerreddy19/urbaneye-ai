@@ -25,6 +25,8 @@ import {
 import RoadRoute from '../../shared/RoadRoute';
 import { useUrbanData } from '../../../context/UrbanDataContext';
 import { useSmoothVehicleLerp } from '../../../hooks/useSmoothVehicleLerp';
+import { BusStatusCard } from '../../transit/BusStatusCard';
+import { useTransitStore } from '../../../store/transitStore';
 
 // Map Controller for Smooth Center, Zoom, and Active Route Bounds Flying
 const MapController = ({ centerCoords, zoomLevel, activeRoute }) => {
@@ -55,6 +57,7 @@ export const CitizenMap = ({
   centerCoordinates = [16.3067, 80.4365] // Guntur Central
 }) => {
   const { data, toggleAmbulanceBooking } = useUrbanData();
+  const { selectedBus, setSelectedBus } = useTransitStore();
   const [mapReady, setMapReady] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
   const [showTrafficLayer, setShowTrafficLayer] = useState(true);
@@ -315,7 +318,10 @@ export const CitizenMap = ({
                 eventHandlers={{
                   mouseover: () => setIsPaused(true),
                   mouseout: () => setIsPaused(false),
-                  click: () => setIsPaused(true),
+                  click: () => {
+                    setIsPaused(true);
+                    setSelectedBus(bus);
+                  },
                 }}
               >
                 <Popup className="custom-leaflet-popup">
@@ -324,8 +330,14 @@ export const CitizenMap = ({
                       <div className="font-bold text-xs text-blue-400 font-mono">
                         Bus {bus.routeNumber} ({bus.busNumber || bus.id})
                       </div>
-                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
-                        {bus.status || 'Active'}
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                        (bus.seatOccupancy || 0) >= 85
+                          ? 'bg-rose-950/80 text-rose-300 border-rose-800'
+                          : (bus.seatOccupancy || 0) >= 50
+                          ? 'bg-amber-950/80 text-amber-300 border-amber-800'
+                          : 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                      }`}>
+                        {(bus.seatOccupancy || 0) >= 85 ? 'Bus Full' : (bus.seatOccupancy || 0) >= 50 ? 'Moderate' : 'Seats Available'}
                       </span>
                     </div>
 
@@ -344,10 +356,18 @@ export const CitizenMap = ({
                     </div>
 
                     <div className="text-[10px] text-slate-300 flex justify-between font-mono">
-                      <span>Occupancy: <b className="text-blue-300">{bus.seatOccupancy}%</b></span>
+                      <span>Occupancy: <b className={(bus.seatOccupancy || 0) >= 85 ? 'text-rose-400' : 'text-emerald-400'}>{bus.seatOccupancy}%</b></span>
                       <span>Speed: <b>{bus.speedKmph} km/h</b></span>
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono">Next Stop: <b className="text-slate-200">{bus.nextStop}</b></div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBus(bus)}
+                      className="w-full mt-1.5 py-1.5 px-2 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 text-blue-300 text-xs font-mono font-bold transition cursor-pointer text-center"
+                    >
+                      Show Live Occupancy Drawer →
+                    </button>
                   </div>
                 </Popup>
               </Marker>
@@ -608,6 +628,13 @@ export const CitizenMap = ({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Bus Live Status & Occupancy Card Drawer */}
+      {selectedBus && (
+        <div className="absolute bottom-12 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-[1050]">
+          <BusStatusCard onClose={() => setSelectedBus(null)} />
         </div>
       )}
     </div>

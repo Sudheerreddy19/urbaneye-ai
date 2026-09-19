@@ -16,6 +16,7 @@ import HistoryView from './views/HistoryView';
 import FavoritesView from './views/FavoritesView';
 import HazardsView from './views/HazardsView';
 import BookingsView from './views/BookingsView';
+import PublicTransportView from './views/PublicTransportView';
 import { PhoneCall, ShieldAlert, X, Radio } from 'lucide-react';
 
 export const CitizenDashboard = ({ onLogout }) => {
@@ -166,8 +167,22 @@ export const CitizenDashboard = ({ onLogout }) => {
           </motion.div>
         );
 
-      case 'home':
       case 'transport':
+      case 'public transport':
+        return (
+          <motion.div
+            key="transport-view"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25 }}
+            className="w-full h-full overflow-y-auto"
+          >
+            <PublicTransportView />
+          </motion.div>
+        );
+
+      case 'home':
       case 'traffic':
       case 'ambulances':
       default:

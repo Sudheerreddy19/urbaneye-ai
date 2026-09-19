@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   login as apiLogin,
   register as apiRegister,
-  googleAuth as apiGoogleAuth,
+  logoutApi,
   getMe,
   TOKEN_KEY,
   saveSession,
@@ -65,24 +65,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── Register (new user) ──────────────────────────────────────────────────
-  const register = async ({ name, email, phone, password, frontendRole }) => {
-    const data = await apiRegister({ name, email, phone, password, frontendRole });
-    const resolvedRole = backendRoleToFrontend(data.role);
-    const userObj = {
-      id:    data.userId,
-      name:  data.name,
-      email: data.email,
-      role:  resolvedRole,
-    };
-    saveSession(data.token, userObj);
-    setUser(userObj);
-    setIsAuthenticated(true);
-    return resolvedRole;
-  };
-
-  // ── Google / SSO Auth ────────────────────────────────────────────────────
-  const googleLogin = async ({ email, name, frontendRole }) => {
-    const data = await apiGoogleAuth({ email, name, frontendRole });
+  const register = async ({ name, email, phone, password, frontendRole, authorizationKey }) => {
+    const data = await apiRegister({ name, email, phone, password, frontendRole, authorizationKey });
     const resolvedRole = backendRoleToFrontend(data.role);
     const userObj = {
       id:    data.userId,
@@ -98,6 +82,7 @@ export const AuthProvider = ({ children }) => {
 
   // ── Logout ───────────────────────────────────────────────────────────────
   const logout = () => {
+    logoutApi();
     clearSession();
     setUser(null);
     setIsAuthenticated(false);
@@ -110,7 +95,6 @@ export const AuthProvider = ({ children }) => {
     isLoading,
     login,
     register,
-    googleLogin,
     logout,
   };
 

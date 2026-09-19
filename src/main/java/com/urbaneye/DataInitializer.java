@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Seeds the database with rich sample data for Phase 1, 2, 3, 4, and 5:
- * - 3 Users (USER, POLICE, HOSPITAL) with password "password123"
+ * - Zero hardcoded users (all accounts must be registered via registration endpoint)
  * - 3 Hospitals with ICU, Blood units & Emergency doctors
  * - 10 Drivers & 10 Ambulances spread across Guntur (AMB-101 for simulation)
  * - 4 Bus Routes + real stops (Route 21A, 14B, 7C, 33D)
@@ -28,7 +28,6 @@ import org.springframework.stereotype.Component;
 public class DataInitializer implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
-    private static final String DEFAULT_PASSWORD = "password123";
 
     private final UserRepository             userRepository;
     private final HospitalRepository         hospitalRepository;
@@ -45,7 +44,6 @@ public class DataInitializer implements ApplicationRunner {
     private final SignalEventRepository      signalEventRepository;
     private final WaterloggingZoneRepository waterloggingZoneRepository;
     private final EmergencyRequestRepository emergencyRequestRepository;
-    private final PasswordEncoder            passwordEncoder;
 
     public DataInitializer(UserRepository userRepository,
                            HospitalRepository hospitalRepository,
@@ -61,8 +59,7 @@ public class DataInitializer implements ApplicationRunner {
                            GreenCorridorRepository greenCorridorRepository,
                            SignalEventRepository signalEventRepository,
                            WaterloggingZoneRepository waterloggingZoneRepository,
-                           EmergencyRequestRepository emergencyRequestRepository,
-                           PasswordEncoder passwordEncoder) {
+                           EmergencyRequestRepository emergencyRequestRepository) {
         this.userRepository             = userRepository;
         this.hospitalRepository         = hospitalRepository;
         this.driverRepository           = driverRepository;
@@ -78,38 +75,30 @@ public class DataInitializer implements ApplicationRunner {
         this.signalEventRepository      = signalEventRepository;
         this.waterloggingZoneRepository = waterloggingZoneRepository;
         this.emergencyRequestRepository = emergencyRequestRepository;
-        this.passwordEncoder            = passwordEncoder;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        if (userRepository.count() > 0) {
-            log.info("DB already seeded — skipping DataInitializer.");
+        // Enforce removal of any legacy default demo accounts
+        userRepository.findByEmail("user@urbaneye.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("police@urbaneye.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("hospital@urbaneye.com").ifPresent(userRepository::delete);
+
+        if (hospitalRepository.count() > 0) {
+            log.info("Smart city infrastructure already seeded — skipping DataInitializer.");
             return;
         }
-        log.info("🌱 Seeding UrbanEye database for Phase 1 through Phase 5...");
-        User user = seedUsers();
+        log.info("🌱 Seeding UrbanEye smart city infrastructure (Hospitals, Routes, Signals)...");
         Hospital h1 = seedHospitals();
         Ambulance amb1 = seedDriversAndAmbulances(h1);
         seedRoutesAndBuses();
         seedRoadSegments();
         seedTrafficSignals();
-        seedIncidents(user);
+        seedIncidents();
         seedGreenCorridor(h1);
         seedWaterloggingZones();
-        seedEmergencyCases(user, amb1, h1);
-        log.info("✅ Database seeded successfully with complete smart-city emergency & mobility platform.");
-    }
-
-    // ── Users ─────────────────────────────────────────────────────────────────
-
-    private User seedUsers() {
-        String h = passwordEncoder.encode(DEFAULT_PASSWORD);
-        User u1 = userRepository.save(User.builder().name("Sudheer Kumar").email("user@urbaneye.com").phone("+919876543210").password(h).role(Role.USER).build());
-        userRepository.save(User.builder().name("Inspector Ravi Shankar").email("police@urbaneye.com").phone("+919876543211").password(h).role(Role.POLICE).build());
-        userRepository.save(User.builder().name("Guntur City Hospital Admin").email("hospital@urbaneye.com").phone("+919876543212").password(h).role(Role.HOSPITAL).build());
-        log.info("  ✓ Users (3)");
-        return u1;
+        seedEmergencyCases(amb1, h1);
+        log.info("✅ Database smart city infrastructure seeded successfully (NO default accounts).");
     }
 
     // ── Hospitals ─────────────────────────────────────────────────────────────
@@ -322,13 +311,13 @@ public class DataInitializer implements ApplicationRunner {
 
     // ── Road Hazards & Incidents ──────────────────────────────────────────────
 
-    private void seedIncidents(User user) {
+    private void seedIncidents() {
         incidentRepository.save(Incident.builder()
                 .type(IncidentType.ACCIDENT)
                 .latitude(16.3070).longitude(80.4360)
                 .description("Two-wheeler collision near MG Road crossing. Traffic bottleneck.")
                 .severity(IncidentSeverity.CRITICAL)
-                .reportedBy(user)
+                .reportedBy(null)
                 .status(IncidentStatus.REPORTED)
                 .build());
 
@@ -337,7 +326,7 @@ public class DataInitializer implements ApplicationRunner {
                 .latitude(16.3030).longitude(80.4280)
                 .description("Deep pothole after rain on Inner Ring Road.")
                 .severity(IncidentSeverity.MEDIUM)
-                .reportedBy(user)
+                .reportedBy(null)
                 .status(IncidentStatus.REPORTED)
                 .build());
 
@@ -346,7 +335,7 @@ public class DataInitializer implements ApplicationRunner {
                 .latitude(16.3130).longitude(80.4440)
                 .description("Pipeline work on Brodipet 4th Lane. One lane closed.")
                 .severity(IncidentSeverity.HIGH)
-                .reportedBy(user)
+                .reportedBy(null)
                 .status(IncidentStatus.ACKNOWLEDGED)
                 .build());
 
@@ -355,7 +344,7 @@ public class DataInitializer implements ApplicationRunner {
                 .latitude(16.3160).longitude(80.4470)
                 .description("Heavy waterlogging near Lakshmipuram underpass.")
                 .severity(IncidentSeverity.HIGH)
-                .reportedBy(user)
+                .reportedBy(null)
                 .status(IncidentStatus.REPORTED)
                 .build());
 
@@ -416,9 +405,9 @@ public class DataInitializer implements ApplicationRunner {
 
     // ── Active Emergency Cases for Hospital Queue (Phase 5) ───────────────────
 
-    private void seedEmergencyCases(User user, Ambulance ambulance, Hospital hospital) {
+    private void seedEmergencyCases(Ambulance ambulance, Hospital hospital) {
         emergencyRequestRepository.save(EmergencyRequest.builder()
-                .user(user)
+                .user(null)
                 .ambulance(ambulance)
                 .hospital(hospital)
                 .patientName("K. Rajesh (Severe Trauma)")

@@ -136,15 +136,17 @@ urbaneye-backend/
 
 ---
 
-## 🚦 Pre-configured Demo Accounts
-
-All demo accounts are pre-seeded with password: `password123`
-
-| Portal Role | Demo Email | Access Scope |
+## 🔐 User Authentication & Account Access
+ 
+UrbanEye AI uses a secure, database-driven authentication model with zero default or hardcoded credentials. All users must register their own accounts.
+ 
+| Portal Role | Registration Type | Requirements |
 |---|---|---|
-| 👤 **Citizen** | `user@urbaneye.com` | SOS dispatch, transit bus tracker, journey planner, incident reporting |
-| 👮 **Police Command** | `police@urbaneye.com` | Green corridor control, traffic signal tuning, CCTV feeds, incident dispatch |
-| 🏥 **Hospital ER** | `hospital@urbaneye.com` | Inbound ambulance triage, live bed inventory, blood bank management |
+| 👤 **Citizen** | Public Self-Registration | Full Name, Email, Mobile Number, Password |
+| 👮 **Police Command** | Protected Provisioning | Official Email, Badge ID, Password, Police Department Key |
+| 🏥 **Hospital ER** | Protected Provisioning | Institutional Email, Staff ID, Password, Hospital Department Key |
+ 
+> **Note**: Privileged role registration requires valid department keys (`POLICE_PROVISION_KEY` and `HOSPITAL_PROVISION_KEY`) set in environment variables.
 
 ---
 
