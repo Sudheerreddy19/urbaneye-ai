@@ -215,7 +215,7 @@ export const CitizenDashboard = ({ onLogout }) => {
               className="lg:col-span-6 flex flex-col h-full min-h-[420px] relative overflow-hidden"
             >
               <CitizenMap
-                buses={buses}
+                buses={[]}
                 ambulances={ambulances}
                 policePatrols={policePatrols}
                 trafficSignals={trafficSignals}

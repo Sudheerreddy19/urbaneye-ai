@@ -66,15 +66,15 @@ export const UrbanDataProvider = ({ children }) => {
           // Merge backend buses if fetched
           if (busRes.status === 'fulfilled' && Array.isArray(busRes.value) && busRes.value.length > 0) {
             const mappedBuses = busRes.value.map((dbBus, idx) => {
-              const fallback = prev.buses?.[idx] || prev.buses?.[0] || {};
+              const fallback = prev.buses?.find((b) => b.routeNumber === dbBus.busNumber || b.busNumber === dbBus.busNumber) || prev.buses?.[idx % (prev.buses?.length || 1)] || {};
               return {
                 ...fallback,
                 id: dbBus.busNumber || `BUS-${dbBus.id}`,
                 busNumber: dbBus.busNumber || fallback.busNumber,
-                routeNumber: dbBus.route?.routeNumber || fallback.routeNumber,
-                routeName: dbBus.route?.routeName || fallback.routeName,
-                driverName: dbBus.driverName || fallback.driverName,
-                driverPhone: dbBus.driverPhone || fallback.driverPhone,
+                routeNumber: dbBus.busRoute?.routeNumber || dbBus.route || fallback.routeNumber,
+                routeName: dbBus.busRoute?.routeName || dbBus.route || fallback.routeName,
+                driverName: fallback.driverName || 'Driver ' + (idx + 1),
+                driverPhone: fallback.driverPhone || '+91 98480 ' + (11220 + idx),
                 currentCoordinates: (dbBus.latitude && dbBus.longitude) ? [dbBus.latitude, dbBus.longitude] : fallback.currentCoordinates,
                 speedKmph: dbBus.speed || fallback.speedKmph || 32,
               };

@@ -74,13 +74,13 @@ export function useBusTracking(activeRouteFilter?: string | null) {
 
   // 2. Fallback base fleet when backend is initialising or offline
   const fallbackFleet: LiveBus[] = (mockUrbanData?.buses || []).map((b: any, idx: number) => ({
-    id: b.id || `BUS-${b.busNumber || idx}`,
+    id: b.id || b.busNumber || `BUS-${idx}`,
     busNumber: b.busNumber || `AP-07-Z-${2100 + idx}`,
-    registrationNumber: b.busNumber || `AP-07-Z-${2100 + idx}`,
+    registrationNumber: b.registrationNumber || b.busNumber || `AP07-TG-210${idx + 1}`,
     routeNumber: b.routeNumber || '21A',
-    routeName: b.routeName || 'Guntur Junction ⇄ Amaravati Seed Capital',
-    driverName: b.driverName || 'K. Srinivasa Rao',
-    driverPhone: b.driverPhone || '+91 98480 11221',
+    routeName: b.routeName || 'Guntur Corridor Transit',
+    driverName: b.driverName || 'Driver ' + (idx + 1),
+    driverPhone: b.driverPhone || '+91 98480 ' + (11220 + idx),
     currentCoordinates: b.currentCoordinates || [16.3067, 80.4365],
     previousCoordinates: b.path?.[0] || b.currentCoordinates || [16.3067, 80.4365],
     speedKmph: b.speedKmph || 32,
@@ -112,10 +112,12 @@ export function useBusTracking(activeRouteFilter?: string | null) {
     if (backendBuses && Array.isArray(backendBuses) && backendBuses.length > 0) {
       setTelemetryMode('LIVE_BACKEND');
       setBuses((currentBuses) => {
-        const busMap = new Map(currentBuses.map((b) => [b.busNumber, b]));
+        const busMap = new Map(currentBuses.map((b) => [b.routeNumber || b.busNumber, b]));
 
-        return backendBuses.map((dbBus: any) => {
-          const existing = busMap.get(dbBus.busNumber) || busMap.get(dbBus.id) || fallbackFleet[0];
+        return backendBuses.map((dbBus: any, idx: number) => {
+          const routeKey = dbBus.busRoute?.routeNumber || dbBus.busNumber || dbBus.route;
+          const fallback = fallbackFleet.find((f) => f.routeNumber === routeKey || f.busNumber === dbBus.busNumber) || fallbackFleet[idx % fallbackFleet.length];
+          const existing = busMap.get(routeKey) || busMap.get(dbBus.busNumber) || busMap.get(dbBus.id) || fallback;
           const newCoords: [number, number] = [
             dbBus.latitude || existing.currentCoordinates[0],
             dbBus.longitude || existing.currentCoordinates[1],
@@ -140,6 +142,8 @@ export function useBusTracking(activeRouteFilter?: string | null) {
             registrationNumber: dbBus.registrationNumber || existing.registrationNumber,
             routeNumber: dbBus.busRoute?.routeNumber || dbBus.route || existing.routeNumber,
             routeName: dbBus.busRoute?.routeName || dbBus.route || existing.routeName,
+            driverName: existing.driverName,
+            driverPhone: existing.driverPhone,
             previousCoordinates: prevCoords,
             currentCoordinates: newCoords,
             heading: calculatedHeading,

@@ -13,7 +13,6 @@ import {
   Play
 } from 'lucide-react';
 import {
-  createBusMarker,
   createAmbulanceMarker,
   createHazardMarker,
   createUserLocationMarker,
@@ -25,8 +24,6 @@ import {
 import RoadRoute from '../../shared/RoadRoute';
 import { useUrbanData } from '../../../context/UrbanDataContext';
 import { useSmoothVehicleLerp } from '../../../hooks/useSmoothVehicleLerp';
-import { BusStatusCard } from '../../transit/BusStatusCard';
-import { useTransitStore } from '../../../store/transitStore';
 
 // Map Controller for Smooth Center, Zoom, and Active Route Bounds Flying
 const MapController = ({ centerCoords, zoomLevel, activeRoute }) => {
@@ -57,7 +54,6 @@ export const CitizenMap = ({
   centerCoordinates = [16.3067, 80.4365] // Guntur Central
 }) => {
   const { data, toggleAmbulanceBooking } = useUrbanData();
-  const { selectedBus, setSelectedBus } = useTransitStore();
   const [mapReady, setMapReady] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
   const [showTrafficLayer, setShowTrafficLayer] = useState(true);
@@ -69,14 +65,12 @@ export const CitizenMap = ({
   const [isPaused, setIsPaused] = useState(false);
 
   // Raw vehicle feeds from props or context
-  const rawBuses = buses.length > 0 ? buses : (data?.buses || []);
   const rawAmbulances = ambulances.length > 0 ? ambulances : (data?.ambulances || []);
   const rawPatrols = policePatrols.length > 0 ? policePatrols : (data?.policePatrols || []);
   const trafficSegments = data?.trafficSegments || [];
   const incidents = data?.incidents || [];
 
   // Smooth Linear Interpolation (Lerp) with freeze-on-hover/click
-  const smoothBuses = useSmoothVehicleLerp(rawBuses, isPaused, 50);
   const smoothAmbulances = useSmoothVehicleLerp(rawAmbulances, isPaused, 50);
   const smoothPatrols = useSmoothVehicleLerp(rawPatrols, isPaused, 50);
 
@@ -309,69 +303,6 @@ export const CitizenMap = ({
               </Popup>
             </Marker>
 
-            {/* High-Fidelity 3D Smooth Animated Buses (🚌) with Pause on Hover/Click */}
-            {smoothBuses.map((bus) => (
-              <Marker
-                key={bus.id}
-                position={bus.currentCoordinates}
-                icon={createBusMarker(bus.routeNumber, bus.seatOccupancy)}
-                eventHandlers={{
-                  mouseover: () => setIsPaused(true),
-                  mouseout: () => setIsPaused(false),
-                  click: () => {
-                    setIsPaused(true);
-                    setSelectedBus(bus);
-                  },
-                }}
-              >
-                <Popup className="custom-leaflet-popup">
-                  <div className="p-2.5 text-slate-100 font-sans space-y-2 min-w-[230px]">
-                    <div className="flex items-center justify-between">
-                      <div className="font-bold text-xs text-blue-400 font-mono">
-                        Bus {bus.routeNumber} ({bus.busNumber || bus.id})
-                      </div>
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                        (bus.seatOccupancy || 0) >= 85
-                          ? 'bg-rose-950/80 text-rose-300 border-rose-800'
-                          : (bus.seatOccupancy || 0) >= 50
-                          ? 'bg-amber-950/80 text-amber-300 border-amber-800'
-                          : 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
-                      }`}>
-                        {(bus.seatOccupancy || 0) >= 85 ? 'Bus Full' : (bus.seatOccupancy || 0) >= 50 ? 'Moderate' : 'Seats Available'}
-                      </span>
-                    </div>
-
-                    <div className="text-[11px] font-semibold text-slate-200">{bus.routeName}</div>
-
-                    {/* Driver & Contact Card */}
-                    <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 space-y-1">
-                      <div className="text-[10px] text-slate-400">Driver: <b className="text-white">{bus.driverName || 'K. Srinivasa Rao'}</b></div>
-                      <a
-                        href={`tel:${bus.driverPhone || '+919848011221'}`}
-                        className="text-[11px] font-mono text-emerald-400 hover:text-emerald-300 flex items-center justify-between pt-0.5 border-t border-slate-800"
-                      >
-                        <span>📞 {bus.driverPhone || '+91 98480 11221'}</span>
-                        <span className="text-[9px] bg-emerald-600/30 text-emerald-300 px-1 rounded font-bold">CALL</span>
-                      </a>
-                    </div>
-
-                    <div className="text-[10px] text-slate-300 flex justify-between font-mono">
-                      <span>Occupancy: <b className={(bus.seatOccupancy || 0) >= 85 ? 'text-rose-400' : 'text-emerald-400'}>{bus.seatOccupancy}%</b></span>
-                      <span>Speed: <b>{bus.speedKmph} km/h</b></span>
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-mono">Next Stop: <b className="text-slate-200">{bus.nextStop}</b></div>
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBus(bus)}
-                      className="w-full mt-1.5 py-1.5 px-2 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 text-blue-300 text-xs font-mono font-bold transition cursor-pointer text-center"
-                    >
-                      Show Live Occupancy Drawer →
-                    </button>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
 
             {/* High-Fidelity 3D Smooth Animated Ambulances (🚑) with Pause on Hover/Click & Booking */}
             {smoothAmbulances.map((amb) => {
@@ -594,8 +525,8 @@ export const CitizenMap = ({
 
           <div className="grid grid-cols-2 gap-2 text-[11px]">
             <div className="flex items-center gap-2">
-              <span className="text-lg leading-none">🚌</span>
-              <span>City Transit Bus</span>
+              <span className="text-lg leading-none">🏥</span>
+              <span>Hospital Emergency Hub</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-lg leading-none">🚑</span>
@@ -628,13 +559,6 @@ export const CitizenMap = ({
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Floating Bus Live Status & Occupancy Card Drawer */}
-      {selectedBus && (
-        <div className="absolute bottom-12 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-[1050]">
-          <BusStatusCard onClose={() => setSelectedBus(null)} />
         </div>
       )}
     </div>

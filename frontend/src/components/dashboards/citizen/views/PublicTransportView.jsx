@@ -34,8 +34,20 @@ export const PublicTransportView = () => {
   const [occupancyFilter, setOccupancyFilter] = useState('all');
   const { buses, inspectBus, telemetryMode, lastHeartbeat, refetchTelemetry } = useBusTracking();
 
+  // Deduplicate buses strictly by routeNumber / busNumber to prevent any duplicate bus data
+  const uniqueBuses = React.useMemo(() => {
+    const map = new Map();
+    for (const b of buses) {
+      const key = b.routeNumber || b.busNumber || b.id;
+      if (!map.has(key)) {
+        map.set(key, b);
+      }
+    }
+    return Array.from(map.values());
+  }, [buses]);
+
   // Filter buses based on user selections
-  const filteredBuses = buses.filter((b) => {
+  const filteredBuses = uniqueBuses.filter((b) => {
     if (routeFilter !== 'all' && b.routeNumber !== routeFilter) return false;
     if (occupancyFilter === 'seats_available' && (b.seatOccupancy || 0) >= 60) return false;
     if (occupancyFilter === 'moderate' && ((b.seatOccupancy || 0) < 60 || (b.seatOccupancy || 0) >= 85)) return false;
@@ -43,7 +55,7 @@ export const PublicTransportView = () => {
     return true;
   });
 
-  const availableRoutes = Array.from(new Set(buses.map((b) => b.routeNumber)));
+  const availableRoutes = Array.from(new Set(uniqueBuses.map((b) => b.routeNumber)));
 
   return (
     <div className="w-full h-full flex flex-col gap-4 max-w-[1700px] mx-auto p-2 sm:p-4 text-slate-100 overflow-hidden">
@@ -74,7 +86,7 @@ export const PublicTransportView = () => {
         {/* Telemetry Status Bar */}
         <div className="flex items-center gap-2 text-xs font-mono">
           <div className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 flex items-center gap-2">
-            <span className="text-blue-400 font-bold">{buses.length}</span>
+            <span className="text-blue-400 font-bold">{uniqueBuses.length}</span>
             <span className="text-slate-500">Live Buses</span>
           </div>
 

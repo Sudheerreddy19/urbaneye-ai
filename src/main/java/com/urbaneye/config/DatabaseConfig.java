@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import javax.sql.DataSource;
 
 @Configuration
@@ -56,6 +58,16 @@ public class DatabaseConfig {
                trimmed.equalsIgnoreCase("PGPASSWORD");
     }
 
+    private String cleanQuotes(String val) {
+        if (val == null) return null;
+        String trimmed = val.trim();
+        if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+            (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+            return trimmed.substring(1, trimmed.length() - 1).trim();
+        }
+        return trimmed;
+    }
+
     @Bean
     @Primary
     public DataSource dataSource() {
@@ -63,10 +75,13 @@ public class DatabaseConfig {
         String host = System.getenv("PGHOST");
         String port = System.getenv("PGPORT");
         String database = System.getenv("PGDATABASE");
-        String username = System.getenv("PGUSER");
-        String password = System.getenv("PGPASSWORD");
+        String envUser = cleanQuotes(System.getenv("PGUSER"));
+        String envPassword = cleanQuotes(System.getenv("PGPASSWORD"));
 
-        String jdbcUrl;
+        String jdbcUrl = null;
+        String username = null;
+        String password = null;
+        String passwordSource = "none";
 
         // 1. DATABASE_URL priority (Railway PostgreSQL service)
         if (!isInvalidOrPlaceholder(databaseUrl)) {
@@ -74,33 +89,81 @@ public class DatabaseConfig {
             if (cleanUrl.startsWith("jdbc:")) {
                 cleanUrl = cleanUrl.substring(5);
             }
+
             try {
-                java.net.URI uri = new java.net.URI(cleanUrl);
-                String userInfo = uri.getUserInfo();
-                if (userInfo != null && userInfo.contains(":")) {
-                    String[] userPass = userInfo.split(":", 2);
-                    if (isInvalidOrPlaceholder(username)) {
-                        username = userPass[0];
-                    }
-                    if (isInvalidOrPlaceholder(password)) {
-                        password = userPass[1];
-                    }
-                } else if (userInfo != null && !userInfo.isBlank()) {
-                    if (isInvalidOrPlaceholder(username)) {
-                        username = userInfo;
+                String withoutScheme = cleanUrl;
+                if (withoutScheme.contains("://")) {
+                    withoutScheme = withoutScheme.substring(withoutScheme.indexOf("://") + 3);
+                }
+
+                String urlUser = null;
+                String urlPass = null;
+
+                // Split userInfo from host[:port]/database
+                if (withoutScheme.contains("@")) {
+                    int atIndex = withoutScheme.lastIndexOf('@');
+                    String userInfoPart = withoutScheme.substring(0, atIndex);
+                    withoutScheme = withoutScheme.substring(atIndex + 1);
+
+                    if (userInfoPart.contains(":")) {
+                        int colonIndex = userInfoPart.indexOf(':');
+                        urlUser = URLDecoder.decode(userInfoPart.substring(0, colonIndex), StandardCharsets.UTF_8);
+                        urlPass = URLDecoder.decode(userInfoPart.substring(colonIndex + 1), StandardCharsets.UTF_8);
+                    } else {
+                        urlUser = URLDecoder.decode(userInfoPart, StandardCharsets.UTF_8);
                     }
                 }
-                String h = uri.getHost();
-                int p = uri.getPort() > 0 ? uri.getPort() : 5432;
-                String rawPath = uri.getPath();
-                String db = (rawPath != null && rawPath.length() > 1) ? rawPath.substring(1) : "urbaneye_db";
-                if (uri.getQuery() != null && !uri.getQuery().isBlank()) {
-                    jdbcUrl = "jdbc:postgresql://" + h + ":" + p + "/" + db + "?" + uri.getQuery();
+
+                String urlQuery = null;
+                if (withoutScheme.contains("?")) {
+                    int qIndex = withoutScheme.indexOf('?');
+                    urlQuery = withoutScheme.substring(qIndex + 1);
+                    withoutScheme = withoutScheme.substring(0, qIndex);
+                }
+
+                String urlHost;
+                String urlPort;
+                String urlDb;
+
+                if (withoutScheme.contains("/")) {
+                    int slashIndex = withoutScheme.indexOf('/');
+                    String hostPort = withoutScheme.substring(0, slashIndex);
+                    urlDb = withoutScheme.substring(slashIndex + 1);
+                    if (hostPort.contains(":")) {
+                        urlHost = hostPort.substring(0, hostPort.indexOf(':'));
+                        urlPort = hostPort.substring(hostPort.indexOf(':') + 1);
+                    } else {
+                        urlHost = hostPort;
+                        urlPort = "5432";
+                    }
                 } else {
-                    jdbcUrl = "jdbc:postgresql://" + h + ":" + p + "/" + db;
+                    if (withoutScheme.contains(":")) {
+                        urlHost = withoutScheme.substring(0, withoutScheme.indexOf(':'));
+                        urlPort = withoutScheme.substring(withoutScheme.indexOf(':') + 1);
+                    } else {
+                        urlHost = withoutScheme;
+                        urlPort = "5432";
+                    }
+                    urlDb = "railway";
+                }
+
+                if (urlHost != null && !urlHost.isBlank()) {
+                    jdbcUrl = "jdbc:postgresql://" + urlHost + ":" + urlPort + "/" + (urlDb != null && !urlDb.isBlank() ? urlDb : "railway");
+                    if (urlQuery != null && !urlQuery.isBlank()) {
+                        jdbcUrl += "?" + urlQuery;
+                    }
+                }
+
+                // Priority 1: Use credentials directly from DATABASE_URL if present
+                if (urlUser != null && !urlUser.isBlank()) {
+                    username = urlUser;
+                }
+                if (urlPass != null && !urlPass.isBlank()) {
+                    password = cleanQuotes(urlPass);
+                    passwordSource = "DATABASE_URL";
                 }
             } catch (Exception e) {
-                log.warn("Could not parse DATABASE_URL as URI, using direct conversion: {}", e.getMessage());
+                log.warn("Error parsing DATABASE_URL as structured URL: {}. Using fallback conversion.", e.getMessage());
                 if (databaseUrl.startsWith("postgres://")) {
                     jdbcUrl = databaseUrl.replace("postgres://", "jdbc:postgresql://");
                 } else if (databaseUrl.startsWith("postgresql://")) {
@@ -110,40 +173,56 @@ public class DatabaseConfig {
                 }
             }
         }
+
         // 2. PGHOST + PGPORT + PGDATABASE + PGUSER + PGPASSWORD
-        else if (!isInvalidOrPlaceholder(host)) {
-            String resolvedPort = !isInvalidOrPlaceholder(port) ? port.trim() : "5432";
-            String resolvedDb = !isInvalidOrPlaceholder(database) ? database.trim() : "urbaneye_db";
-            jdbcUrl = "jdbc:postgresql://" + host.trim() + ":" + resolvedPort + "/" + resolvedDb;
-        }
-        // 3. spring.datasource.* configuration
-        else if (!isInvalidOrPlaceholder(propUrl)) {
-            jdbcUrl = propUrl.trim();
-        }
-        // 4. Local configuration fallback
-        else {
-            jdbcUrl = "jdbc:postgresql://localhost:5432/urbaneye_db";
-        }
-
-        if (isInvalidOrPlaceholder(username)) {
-            username = (!isInvalidOrPlaceholder(propUsername)) ? propUsername.trim() : "postgres";
-        }
-
-        if (isInvalidOrPlaceholder(password)) {
-            if (!isInvalidOrPlaceholder(propPassword)) {
-                password = propPassword.trim();
+        if (jdbcUrl == null) {
+            if (!isInvalidOrPlaceholder(host)) {
+                String resolvedPort = !isInvalidOrPlaceholder(port) ? port.trim() : "5432";
+                String resolvedDb = !isInvalidOrPlaceholder(database) ? database.trim() : "urbaneye_db";
+                jdbcUrl = "jdbc:postgresql://" + host.trim() + ":" + resolvedPort + "/" + resolvedDb;
+            } else if (!isInvalidOrPlaceholder(propUrl)) {
+                jdbcUrl = propUrl.trim();
+            } else {
+                jdbcUrl = "jdbc:postgresql://localhost:5432/urbaneye_db";
             }
         }
 
-        // Strict validation: Fail fast if password is not configured anywhere
+        // Username resolution
+        if (username == null || username.isBlank() || isInvalidOrPlaceholder(username)) {
+            if (!isInvalidOrPlaceholder(envUser)) {
+                username = envUser;
+            } else if (!isInvalidOrPlaceholder(propUsername)) {
+                username = cleanQuotes(propUsername);
+            } else {
+                username = "postgres";
+            }
+        }
+
+        // Password resolution: Fall back to PGPASSWORD / spring.datasource.password if DATABASE_URL had none
+        if (password == null || password.isBlank() || isInvalidOrPlaceholder(password)) {
+            if (!isInvalidOrPlaceholder(envPassword)) {
+                password = envPassword;
+                passwordSource = "PGPASSWORD";
+            } else if (!isInvalidOrPlaceholder(propPassword)) {
+                password = cleanQuotes(propPassword);
+                passwordSource = "spring.datasource.password";
+            }
+        }
+
+        if (password != null) {
+            password = cleanQuotes(password);
+        }
+
+        // Strict validation
         if (password == null || password.isBlank()) {
             throw new IllegalStateException(
-                "PostgreSQL password is not configured! Please provide PGPASSWORD environment variable or spring.datasource.password property."
+                "PostgreSQL password is not configured! Please provide PGPASSWORD environment variable, DATABASE_URL with credentials, or spring.datasource.password property."
             );
         }
 
         log.info("Configuring PostgreSQL DataSource with JDBC URL: {}", jdbcUrl);
         log.info("Database username: {}", username);
+        log.info("Database password resolved from: {} (length: {})", passwordSource, password.length());
 
         HikariConfig config = new HikariConfig();
 

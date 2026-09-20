@@ -1,105 +1,70 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Bus,
   Ambulance,
-  Radio,
+  PhoneCall,
   Clock,
   MapPin,
-  Users,
+  HeartPulse,
   ChevronRight,
-  Sparkles,
-  AlertCircle,
+  ShieldAlert,
   X,
-  Navigation
+  Zap,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
-import { useTransitStore } from '../../../store/transitStore';
 import { useUrbanData } from '../../../context/UrbanDataContext';
 
 export const NearbyTransit = ({ onSelectTransitItem, selectedItem }) => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [showAllModal, setShowAllModal] = useState(false);
-  const { buses: liveBuses, setSelectedBus } = useTransitStore();
-  const { data } = useUrbanData();
+  const { data, toggleAmbulanceBooking } = useUrbanData();
 
-  // Dynamic public transit items derived from real live telemetry
-  const dynamicBusItems = (liveBuses && liveBuses.length > 0 ? liveBuses : (data?.buses || [])).map((b) => {
-    const occupancy = b.seatOccupancy ?? 50;
-    const isFull = occupancy >= 85;
-    const isModerate = occupancy >= 50 && occupancy < 85;
+  const rawAmbulances = data?.ambulances || [];
+
+  // Map all real emergency ambulances from the smart city telemetry
+  const ambulanceItems = rawAmbulances.map((amb) => {
+    const isBooked = !!amb.isBooked;
+    const triage = amb.triage || 'ALS';
 
     return {
-      id: b.id || b.busNumber,
-      type: 'bus',
-      routeNumber: b.routeNumber || '21A',
-      routeName: b.routeName || 'Urban Metro Transit Corridor',
-      driverName: b.driverName || 'K. Srinivasa Rao',
-      driverPhone: b.driverPhone || '+91 98480 11221',
-      eta: b.eta || `${b.etaMinutes || 3} min`,
-      distance: `${b.distanceKm || 0.8} km away`,
-      occupancyPercent: occupancy,
-      occupancyStatus: isFull ? 'Bus Full' : isModerate ? 'Moderate' : 'Seats Available',
-      occupancyColor: isFull ? 'bg-rose-500' : isModerate ? 'bg-amber-500' : 'bg-emerald-500',
-      occupancyTextColor: isFull ? 'text-rose-400' : isModerate ? 'text-amber-400' : 'text-emerald-400',
-      nextStop: b.nextStop || 'Brodipet Main Road',
-      fare: '₹25',
-      ac: (b.acStatus || '').toLowerCase().includes('ac') || true,
-      rawBus: b,
+      id: amb.id,
+      type: 'ambulance',
+      vehicleNumber: amb.vehicleNumber || amb.id,
+      hospitalName: amb.hospitalName || 'Guntur Government Hospital',
+      driverName: amb.driverName || 'Ramesh Kumar',
+      driverPhone: amb.driverPhone || '+91 98765 43220',
+      eta: amb.eta || '3 min',
+      distance: amb.speedKmph > 0 ? '1.2 km away' : 'At Base Station',
+      speedKmph: amb.speedKmph || 45,
+      triage: triage,
+      isBooked: isBooked,
+      condition: amb.condition || (isBooked ? 'Critical' : 'Available'),
+      patientSummary: amb.patientSummary || (isBooked ? 'Emergency Transit Active' : 'Standby Emergency Unit'),
+      activePreemption: amb.activePreemption,
+      sirenStatus: amb.sirenStatus || (isBooked ? 'CODE RED ACTIVE' : 'STANDBY PRIORITY'),
+      raw: amb,
     };
   });
 
-  const dynamicAmbulanceItems = (data?.ambulances || []).slice(0, 2).map((amb) => ({
-    id: amb.id,
-    type: 'ambulance',
-    routeNumber: amb.id,
-    routeName: `${amb.hospitalName || 'Ala Hospital'} EMS Corridor`,
-    driverName: amb.driverName || 'Ramesh Kumar',
-    driverPhone: amb.driverPhone || '+91 98765 43220',
-    eta: amb.eta || '3 min',
-    distance: `${amb.speedKmph > 0 ? '1.2 km away' : 'At Station'}`,
-    occupancyPercent: 100,
-    occupancyStatus: amb.isBooked ? 'IN TRANSIT / BUSY' : 'AVAILABLE (STANDBY)',
-    occupancyColor: amb.isBooked ? 'bg-rose-600 animate-pulse' : 'bg-emerald-500',
-    occupancyTextColor: amb.isBooked ? 'text-rose-400' : 'text-emerald-400',
-    nextStop: amb.hospitalName || 'Ala Super Speciality Hospital',
-    fare: 'Emergency Tier',
-    ac: true,
-  }));
-
-  const dynamicTrafficItems = [
-    {
-      id: 'traffic-sig-04',
-      type: 'traffic',
-      routeNumber: 'SIG-04',
-      routeName: 'Brodipet Main Crossing',
-      eta: '18s green',
-      distance: '350m ahead',
-      occupancyPercent: 65,
-      occupancyStatus: 'Smooth Flow',
-      occupancyColor: 'bg-emerald-500',
-      occupancyTextColor: 'text-emerald-400',
-      nextStop: 'Preempted Wave',
-      fare: 'Normal',
-      ac: false,
-    },
-  ];
-
-  const transitList = [...dynamicBusItems, ...dynamicAmbulanceItems, ...dynamicTrafficItems];
-
   const filterTabs = [
-    { id: 'all', label: 'All' },
-    { id: 'buses', label: 'Buses' },
-    { id: 'ambulances', label: 'Ambulances' },
-    { id: 'traffic', label: 'Traffic' },
+    { id: 'all', label: 'All Units' },
+    { id: 'available', label: 'Available' },
+    { id: 'als', label: 'ALS (Critical)' },
+    { id: 'bls', label: 'BLS (General)' },
+    { id: 'icu', label: 'Mobile ICU' },
   ];
 
-  const filteredItems = transitList.filter((item) => {
+  const filteredItems = ambulanceItems.filter((amb) => {
     if (activeFilter === 'all') return true;
-    if (activeFilter === 'buses') return item.type === 'bus';
-    if (activeFilter === 'ambulances') return item.type === 'ambulance';
-    if (activeFilter === 'traffic') return item.type === 'traffic';
+    if (activeFilter === 'available') return !amb.isBooked;
+    if (activeFilter === 'als') return amb.triage === 'ALS';
+    if (activeFilter === 'bls') return amb.triage === 'BLS';
+    if (activeFilter === 'icu') return amb.triage === 'ICU';
     return true;
   });
+
+  const availableCount = ambulanceItems.filter((a) => !a.isBooked).length;
 
   return (
     <div className="w-full h-full bg-slate-900/90 border border-slate-800/90 rounded-3xl p-4 sm:p-5 shadow-xl backdrop-blur-xl flex flex-col justify-between">
@@ -108,19 +73,27 @@ export const NearbyTransit = ({ onSelectTransitItem, selectedItem }) => {
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div>
             <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-rose-600/20 border border-rose-500/40 flex items-center justify-center">
+                <Ambulance className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
+              </div>
               <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                Nearby You
+                Nearby Ambulances
               </h3>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
             </div>
-            <p className="text-[11px] text-slate-400">
-              Live arrival times & bus occupancy
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Live 108 EMS & Emergency Response Fleet
             </p>
           </div>
 
-          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-blue-950 text-blue-300 border border-blue-800">
-            Radius: 2.0 km
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800">
+              Radius: 5.0 km
+            </span>
+            <span className="text-[9px] font-mono text-emerald-400">
+              {availableCount} Available Now
+            </span>
+          </div>
         </div>
 
         {/* Filter Pills */}
@@ -134,7 +107,7 @@ export const NearbyTransit = ({ onSelectTransitItem, selectedItem }) => {
                 onClick={() => setActiveFilter(tab.id)}
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex-shrink-0 ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
                     : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                 }`}
               >
@@ -144,116 +117,147 @@ export const NearbyTransit = ({ onSelectTransitItem, selectedItem }) => {
           })}
         </div>
 
-        {/* Transit Cards List */}
+        {/* Ambulances Cards List */}
         <div className="space-y-2.5 mt-2.5 max-h-[calc(100vh-340px)] overflow-y-auto pr-0.5 custom-scrollbar">
           <AnimatePresence mode="popLayout">
-            {filteredItems.map((item, idx) => {
-              const isBus = item.type === 'bus';
-              const isAmb = item.type === 'ambulance';
-              const isSelected = selectedItem?.id === item.id;
+            {filteredItems.map((amb, idx) => {
+              const isSelected = selectedItem?.id === amb.id;
+              const isBooked = amb.isBooked;
 
               return (
                 <motion.div
-                  key={item.id}
+                  key={amb.id}
                   layout
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.25, delay: idx * 0.05 }}
+                  transition={{ duration: 0.25, delay: idx * 0.04 }}
                   onClick={() => {
-                    if (onSelectTransitItem) onSelectTransitItem(item);
-                    if (item.rawBus) setSelectedBus(item.rawBus);
+                    if (onSelectTransitItem) onSelectTransitItem(amb);
                   }}
                   className={`group relative p-3 rounded-2xl border transition-all duration-200 cursor-pointer ${
                     isSelected
-                      ? 'bg-blue-950/60 border-blue-500 ring-1 ring-blue-500/50 shadow-lg'
-                      : isAmb
-                      ? 'bg-rose-950/30 border-rose-800/50 hover:border-rose-600/60'
+                      ? 'bg-rose-950/60 border-rose-500 ring-1 ring-rose-500/50 shadow-lg shadow-rose-950/40'
+                      : isBooked
+                      ? 'bg-slate-950/80 border-rose-900/40 hover:border-rose-700/60'
                       : 'bg-slate-950/70 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80'
                   }`}
                 >
-                  {/* Card Header */}
+                  {/* Card Header: Ambulance ID + Triage + Status */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <div
                         className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          isAmb
-                            ? 'bg-rose-600/20 text-rose-400 border border-rose-500/30'
-                            : 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                          isBooked
+                            ? 'bg-rose-600/30 text-rose-400 border border-rose-500/40 animate-pulse'
+                            : 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
                         }`}
                       >
-                        {isAmb ? (
-                          <Ambulance className="w-3.5 h-3.5 animate-pulse" />
-                        ) : (
-                          <Bus className="w-3.5 h-3.5" />
-                        )}
+                        <Ambulance className="w-3.5 h-3.5" />
                       </div>
 
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="font-mono font-bold text-xs text-white">
-                            {item.routeNumber}
+                            {amb.id}
                           </span>
-                          {item.ac && (
-                            <span className="text-[9px] font-mono px-1 py-0.2 bg-cyan-950 text-cyan-400 rounded border border-cyan-800">
-                              AC
-                            </span>
-                          )}
+                          <span
+                            className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                              amb.triage === 'ALS'
+                                ? 'bg-rose-950 text-rose-300 border-rose-800'
+                                : amb.triage === 'ICU'
+                                ? 'bg-purple-950 text-purple-300 border-purple-800'
+                                : 'bg-blue-950 text-blue-300 border-blue-800'
+                            }`}
+                          >
+                            {amb.triage}
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* ETA Badge */}
+                    {/* Status & ETA Badge */}
                     <div className="text-right flex-shrink-0">
-                      <div className="text-xs font-bold text-blue-400 font-mono flex items-center gap-1 justify-end">
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        <span>{item.eta}</span>
+                      <div className="flex items-center gap-1 justify-end font-mono">
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                            isBooked
+                              ? 'bg-rose-950/80 text-rose-300 border border-rose-800'
+                              : 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+                          }`}
+                        >
+                          {isBooked ? 'IN TRANSIT' : 'STANDBY'}
+                        </span>
                       </div>
-                      <div className="text-[10px] text-slate-500 font-mono">
-                        {item.distance}
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1 justify-end">
+                        <Clock className="w-2.5 h-2.5 text-slate-500" />
+                        <span>ETA: <b className="text-slate-200">{amb.eta}</b></span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Route Subtitle */}
-                  <div className="text-[11px] text-slate-300 font-medium truncate mt-1.5">
-                    {item.routeName}
+                  {/* Hospital & Corridor */}
+                  <div className="text-[11px] text-slate-300 font-semibold truncate mt-1.5 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-rose-400 flex-shrink-0" />
+                    <span className="truncate">{amb.hospitalName}</span>
+                  </div>
+
+                  {/* Condition / Patient Summary */}
+                  <div className="mt-1 text-[10px] text-slate-400 font-mono bg-slate-900/80 px-2 py-1 rounded-lg border border-slate-800/80 flex items-center justify-between">
+                    <span className="truncate max-w-[170px]">
+                      {amb.patientSummary}
+                    </span>
+                    <span className="text-slate-300 font-bold flex-shrink-0">
+                      {amb.speedKmph} km/h
+                    </span>
                   </div>
 
                   {/* Driver In-Charge & Direct Contact */}
-                  {item.driverName && (
-                    <div className="mt-1.5 flex items-center justify-between text-[10px] font-mono bg-slate-900/90 px-2 py-1 rounded-lg border border-slate-800">
-                      <span className="text-slate-300 truncate max-w-[130px]">👨‍✈️ {item.driverName}</span>
-                      <a
-                        href={`tel:${item.driverPhone}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-emerald-400 hover:underline flex items-center gap-1 font-bold flex-shrink-0"
-                      >
-                        <span>📞 {item.driverPhone}</span>
-                      </a>
-                    </div>
-                  )}
+                  <div className="mt-1.5 flex items-center justify-between text-[10px] font-mono bg-slate-900/90 px-2 py-1 rounded-lg border border-slate-800">
+                    <span className="text-slate-300 truncate max-w-[130px]">
+                      👨‍✈️ {amb.driverName}
+                    </span>
+                    <a
+                      href={`tel:${amb.driverPhone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-bold flex-shrink-0"
+                    >
+                      <PhoneCall className="w-2.5 h-2.5" />
+                      <span>{amb.driverPhone}</span>
+                    </a>
+                  </div>
 
-                  {/* Occupancy Progress Bar */}
-                  <div className="mt-2 pt-2 border-t border-slate-800/60">
-                    <div className="flex items-center justify-between text-[10px] mb-1">
-                      <span className="text-slate-400 flex items-center gap-1">
-                        <Users className="w-3 h-3 text-slate-500" />
-                        <span>Crowd Index:</span>
-                      </span>
-                      <span className={`font-semibold font-mono ${item.occupancyTextColor}`}>
-                        {item.occupancyPercent}% ({item.occupancyStatus})
-                      </span>
-                    </div>
-
-                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${item.occupancyPercent}%` }}
-                        transition={{ duration: 0.6, ease: 'easeOut' }}
-                        className={`h-full rounded-full ${item.occupancyColor}`}
-                      />
-                    </div>
+                  {/* Booking / Dispatch Action Button */}
+                  <div className="mt-2 pt-1.5 border-t border-slate-800/60 flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-slate-400">
+                      {amb.distance}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (toggleAmbulanceBooking) {
+                          toggleAmbulanceBooking(amb.id);
+                        }
+                      }}
+                      className={`py-1 px-2.5 rounded-lg text-[10px] font-bold font-mono transition cursor-pointer flex items-center gap-1 ${
+                        isBooked
+                          ? 'bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-900/60'
+                          : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30'
+                      }`}
+                    >
+                      {isBooked ? (
+                        <>
+                          <AlertCircle className="w-3 h-3 text-rose-400" />
+                          <span>Cancel Dispatch</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 text-white" />
+                          <span>Dispatch Ambulance</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </motion.div>
               );
@@ -262,16 +266,26 @@ export const NearbyTransit = ({ onSelectTransitItem, selectedItem }) => {
         </div>
       </div>
 
-      {/* Footer Link */}
-      <div className="pt-3 border-t border-slate-800 mt-3">
-        <button
-          type="button"
-          onClick={() => setShowAllModal(true)}
-          className="w-full py-2 px-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-blue-400 hover:text-blue-300 transition flex items-center justify-center gap-1.5 cursor-pointer"
-        >
-          <span>View All Nearby Transit</span>
-          <ChevronRight className="w-3.5 h-3.5" />
-        </button>
+      {/* Footer: Emergency 108 Hotline */}
+      <div className="pt-3 border-t border-slate-800 mt-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <a
+            href="tel:108"
+            className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 text-white font-bold text-xs shadow-lg shadow-rose-950/60 transition flex items-center justify-center gap-1.5"
+          >
+            <PhoneCall className="w-3.5 h-3.5 animate-bounce" />
+            <span>Emergency 108 Call</span>
+          </a>
+          <button
+            type="button"
+            onClick={() => setShowAllModal(true)}
+            className="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1"
+            title="View full fleet list"
+          >
+            <span>All Fleet</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* View All Modal */}
@@ -285,32 +299,59 @@ export const NearbyTransit = ({ onSelectTransitItem, selectedItem }) => {
               className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 text-slate-200 max-h-[85vh] flex flex-col"
             >
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h4 className="font-bold text-sm text-white flex items-center gap-2">
-                  <Navigation className="w-4 h-4 text-blue-400" />
-                  <span>All Active Transit in Guntur Metropolitan Net</span>
-                </h4>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl bg-rose-600/20 border border-rose-500/40 flex items-center justify-center">
+                    <Ambulance className="w-4 h-4 text-rose-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white">
+                      All Ambulances in Guntur EMS Network
+                    </h4>
+                    <p className="text-[10px] text-slate-400">
+                      Trauma centers, ICU mobile units, and active dispatch units
+                    </p>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowAllModal(false)}
-                  className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                  className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                {initialTransitList.map((item) => (
+                {ambulanceItems.map((amb) => (
                   <div
-                    key={item.id}
+                    key={amb.id}
                     className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs"
                   >
                     <div>
-                      <span className="font-mono font-bold text-white text-sm">{item.routeNumber}</span>
-                      <p className="text-slate-400 text-[11px] mt-0.5">{item.routeName}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-white text-sm">
+                          {amb.id}
+                        </span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">
+                          {amb.triage}
+                        </span>
+                        <span
+                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                            amb.isBooked
+                              ? 'bg-rose-950 text-rose-400'
+                              : 'bg-emerald-950 text-emerald-400'
+                          }`}
+                        >
+                          {amb.isBooked ? 'BUSY' : 'STANDBY'}
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] mt-0.5">
+                        {amb.hospitalName} • 👨‍✈️ {amb.driverName}
+                      </p>
                     </div>
                     <div className="text-right font-mono">
-                      <span className="text-blue-400 font-bold">{item.eta}</span>
-                      <p className="text-[10px] text-slate-500">{item.distance}</p>
+                      <span className="text-rose-400 font-bold">{amb.eta}</span>
+                      <p className="text-[10px] text-slate-500">{amb.distance}</p>
                     </div>
                   </div>
                 ))}
@@ -324,3 +365,4 @@ export const NearbyTransit = ({ onSelectTransitItem, selectedItem }) => {
 };
 
 export default NearbyTransit;
+
